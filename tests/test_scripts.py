@@ -149,6 +149,156 @@ class Calc(unittest.TestCase):
         self.assertLess(rl.cached_block_mult(2.5, 0.1, 2), 1.0)
 
 
+class Refresh(unittest.TestCase):
+    """refresh_pricing: fetch, validate, cache only if newer; load_pricing prefers a newer cache."""
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.mkdtemp()
+        self._env = {k: os.environ.get(k) for k in ("TOKEN_RENT_CACHE", "TOKEN_RENT_PRICING")}
+        os.environ["TOKEN_RENT_CACHE"] = os.path.join(self.tmp, "cache")
+        os.environ.pop("TOKEN_RENT_PRICING", None)
+
+    def tearDown(self):
+        import shutil
+        for k, v in self._env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _table(self, as_of, **change):
+        d = json.loads(json.dumps(PRICING))
+        d["as_of"] = as_of
+        d.update(change)
+        p = os.path.join(self.tmp, f"remote-{as_of}.json")
+        with open(p, "w", encoding="utf-8") as fh:
+            json.dump(d, fh)
+        return "file:" + p.replace("\\", "/") if os.name != "nt" else "file:///" + p.replace("\\", "/")
+
+    def test_newer_table_is_cached_and_used(self):
+        ok, msg = rl.refresh_pricing(self._table("2099-01-01"))
+        self.assertTrue(ok, msg)
+        self.assertTrue(os.path.exists(rl.cache_path()))
+        self.assertEqual(rl.load_pricing(warn=False)["as_of"], "2099-01-01")
+
+    def test_older_or_equal_table_is_not_cached(self):
+        ok, msg = rl.refresh_pricing(self._table(PRICING["as_of"]))
+        self.assertTrue(ok)
+        self.assertIn("up to date", msg)
+        self.assertFalse(os.path.exists(rl.cache_path()))
+
+    def test_broken_table_is_rejected(self):
+        ok, msg = rl.refresh_pricing(self._table("2099-01-01", models={}))
+        self.assertFalse(ok)
+        self.assertIn("rejected", msg)
+        self.assertEqual(rl.load_pricing(warn=False)["as_of"], PRICING["as_of"])
+
+    def test_network_failure_is_reported_not_raised(self):
+        ok, msg = rl.refresh_pricing("http://127.0.0.1:9/pricing.json", timeout=2)
+        self.assertFalse(ok)
+        self.assertIn("could not fetch", msg)
+
+    def test_explicit_pricing_path_beats_cache(self):
+        rl.refresh_pricing(self._table("2099-01-01"))
+        os.environ["TOKEN_RENT_PRICING"] = rl.DEFAULT_PRICING
+        self.assertEqual(rl.load_pricing(warn=False)["as_of"], PRICING["as_of"])
+
+
+class Installer(unittest.TestCase):
+    """install.sh / install.ps1 against a local archive of this repo, into a temp home."""
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.mkdtemp()
+        self.files = []
+        for d, dirs, names in os.walk(ROOT):
+            dirs[:] = [x for x in dirs if x not in (".git", "__pycache__")]
+            self.files += [os.path.join(d, n) for n in names if not n.endswith(".pyc")]
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _home(self, *agents):
+        h = os.path.join(self.tmp, "home-" + "-".join(agents or ("none",)))
+        for a in agents:
+            os.makedirs(os.path.join(h, a))
+        os.makedirs(h, exist_ok=True)
+        return h
+
+    def _check(self, home, out):
+        dest = os.path.join(home, ".claude", "skills", "openai-token-rent")
+        self.assertTrue(os.path.isfile(os.path.join(dest, "SKILL.md")), out)
+        self.assertTrue(os.path.isfile(os.path.join(dest, "scripts", "rentlib.py")))
+        self.assertFalse(os.path.exists(os.path.join(dest, "evals")))
+        stale = os.path.join(dest, "STALE")
+        open(stale, "w").close()
+        return stale
+
+    def _run(self, cmd, home, src):
+        import subprocess
+        env = dict(os.environ, TOKEN_RENT_HOME=home, TOKEN_RENT_SRC=src)
+        r = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=120)
+        return r.returncode, r.stdout + r.stderr
+
+    def test_install_sh(self):
+        import shutil
+        import tarfile
+        sh = shutil.which("sh")
+        if not sh:
+            self.skipTest("no sh")
+        src = os.path.join(self.tmp, "src.tar.gz")
+        with tarfile.open(src, "w:gz") as tf:
+            for f in self.files:
+                tf.add(f, "openai-token-rent-x/" + os.path.relpath(f, ROOT).replace("\\", "/"))
+        home = self._home(".claude", ".codex")
+        cmd = [sh, os.path.join(ROOT, "install.sh")]
+        code, out = self._run(cmd, home, src)
+        self.assertEqual(code, 0, out)
+        self.assertTrue(os.path.isfile(os.path.join(home, ".agents", "skills", "openai-token-rent", "SKILL.md")))
+        stale = self._check(home, out)
+        code, out = self._run(cmd, home, src)          # rerun = upgrade in place
+        self.assertEqual(code, 0, out)
+        self.assertFalse(os.path.exists(stale), "upgrade kept an old file")
+
+    def test_install_ps1(self):
+        import shutil
+        import zipfile
+        ps = shutil.which("pwsh") or shutil.which("powershell")
+        if not ps:
+            self.skipTest("no PowerShell")
+        src = os.path.join(self.tmp, "src.zip")
+        with zipfile.ZipFile(src, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in self.files:
+                zf.write(f, "openai-token-rent-x/" + os.path.relpath(f, ROOT).replace("\\", "/"))
+        home = self._home(".claude")
+        script = os.path.join(ROOT, "install.ps1").replace("'", "''")
+        cmd = [ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+               f"Get-Content -Raw '{script}' | Invoke-Expression"]
+        code, out = self._run(cmd, home, src)
+        self.assertIn("installed", out)
+        stale = self._check(home, out)
+        code, out = self._run(cmd, home, src)
+        self.assertFalse(os.path.exists(stale), "upgrade kept an old file")
+
+    def test_bad_archive_installs_nothing(self):
+        import shutil
+        import tarfile
+        sh = shutil.which("sh")
+        if not sh:
+            self.skipTest("no sh")
+        src = os.path.join(self.tmp, "bad.tar.gz")
+        readme = os.path.join(ROOT, "README.md")
+        with tarfile.open(src, "w:gz") as tf:
+            tf.add(readme, "x/README.md")
+        home = self._home(".claude")
+        code, out = self._run([sh, os.path.join(ROOT, "install.sh")], home, src)
+        self.assertNotEqual(code, 0)
+        self.assertFalse(os.path.exists(os.path.join(home, ".claude", "skills")))
+
+
 class Plan(unittest.TestCase):
     def test_example_moves_volatile_segments_down(self):
         _, out = run(strata_plan.main, [os.path.join(EX, "strata.example.json"), "--json"])

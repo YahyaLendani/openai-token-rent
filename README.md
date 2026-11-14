@@ -35,31 +35,51 @@ scripts/strata_lint.py      finds cache-breaking code (CI-friendly exit codes)
 scripts/strata_plan.py      cheapest block order + breakpoints + TTLs for a prompt
 scripts/rent_audit.py       splits real spend from API logs or Codex session files
 scripts/rent_calc.py        admit / compact / ladder / model-ladder / ttl break-even calculator
-data/pricing.json           prices as of the date inside it (refresh it!)
+scripts/refresh_pricing.py  fetches the latest pricing table into a local cache
+install.sh  install.ps1     one-command installers
+data/pricing.json           prices as of the date inside it (refreshed automatically)
 examples/  tests/  evals/
 ```
 
 ## Install
 
-Clone this repository into your agent's skills folder. If you use a fork, swap in its URL.
+One command. It finds Codex CLI and Claude Code on your machine and installs the skill for each
+one it finds. There is nothing to configure afterwards: the agent loads the skill by itself
+when OpenAI costs come up.
 
-**Codex CLI**: user-wide in `~/.agents/skills/`, or per repo in `.agents/skills/`:
-
-```bash
-git clone https://github.com/YahyaLendani/openai-token-rent ~/.agents/skills/openai-token-rent
-```
-
-Then use it with `$openai-token-rent`, or let it trigger on cost and caching questions.
-
-**Claude Code**: user-wide in `~/.claude/skills/`, or per repo in `.claude/skills/`:
+**macOS, Linux, WSL, Git Bash:**
 
 ```bash
-git clone https://github.com/YahyaLendani/openai-token-rent ~/.claude/skills/openai-token-rent
+curl -fsSL https://raw.githubusercontent.com/YahyaLendani/openai-token-rent/main/install.sh | sh
 ```
 
-**Anything else**: point your agent at `SKILL.md`. The scripts need only Python 3.9+.
-`tiktoken` is used for token counts if it is installed. Otherwise the scripts estimate
-characters ÷ 4.
+**Windows PowerShell:**
+
+```powershell
+irm https://raw.githubusercontent.com/YahyaLendani/openai-token-rent/main/install.ps1 | iex
+```
+
+Run the same command again to upgrade. The installer downloads the latest release from this
+repository and copies it to `~/.agents/skills/openai-token-rent` (Codex) and/or
+`~/.claude/skills/openai-token-rent` (Claude Code). If neither agent is found it uses
+`~/.agents/skills`. It uploads nothing about you, touches nothing outside those folders, and leaves a git clone alone.
+To read it before you run it, open [install.sh](install.sh) or [install.ps1](install.ps1).
+
+**Other ways:**
+
+- *git clone*, if you want to pull updates yourself:
+  `git clone https://github.com/YahyaLendani/openai-token-rent ~/.agents/skills/openai-token-rent`
+  (use `~/.claude/skills/` for Claude Code, or `.agents/skills/` / `.claude/skills/` inside a
+  repo for one project only).
+- *claude.ai*: download `openai-token-rent.skill` from the
+  [latest release](https://github.com/YahyaLendani/openai-token-rent/releases/latest) and upload
+  it in the Skills section of claude.ai settings.
+- *Anything else*: point your agent at `SKILL.md`.
+
+In Codex you can also call it by name with `$openai-token-rent`. The scripts need Python 3.9+
+and nothing else; the agent runs them itself and falls back to doing the maths by hand if Python
+is missing. `tiktoken` is used for token counts if it is installed, otherwise the scripts
+estimate characters ÷ 4.
 
 ## The tools, on the bundled examples
 
@@ -117,10 +137,16 @@ $0.1540 once. Compact only if more than 11.0 requests remain (you said 30).
 
 ## Keeping prices current
 
-`data/pricing.json` carries an `as_of` date and its source URL. Every script warns when it is
-more than 60 days old. OpenAI changes prices and models often, so PRs that refresh the table are
-the most useful contribution. Point `TOKEN_RENT_PRICING=/path/to/your.json` at a private table
-for negotiated rates.
+`data/pricing.json` carries an `as_of` date and its source URL. When it is more than 60 days
+old, the scripts say so and the agent runs `scripts/refresh_pricing.py`, which downloads the
+current table from this repository (one GET, nothing sent), checks it, and saves it to a cache
+(`%LOCALAPPDATA%\token-rent` on Windows, `~/.cache/token-rent` elsewhere). Every script then
+uses whichever copy is newer, so the prices stay current without reinstalling. If the network is
+blocked, the bundled table is used and the agent says how old it is.
+
+OpenAI changes prices and models often, so PRs that refresh the table are the most useful
+contribution. Point `TOKEN_RENT_PRICING=/path/to/your.json` at a private table for negotiated
+rates; it always wins over the cache.
 
 ## Accuracy and limits
 

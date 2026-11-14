@@ -1,6 +1,7 @@
 {
   "as_of": "2026-11-14",
   "source": "https://developers.openai.com/api/docs/pricing",
+  "update_url": "https://raw.githubusercontent.com/YahyaLendani/openai-token-rent/main/data/pricing.json",
   "units": "USD per 1M tokens, Standard tier",
   "notes": [
     "Refresh this file from the source URL before trusting dollar figures. Scripts warn when as_of is older than 60 days.",

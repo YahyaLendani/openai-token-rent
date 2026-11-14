@@ -56,7 +56,10 @@ Both can apply: in Codex, optimizing the user's OpenAI app is Workflow A.
 ## Tools
 
 All scripts are Python 3.9+, standard library only, in `scripts/` next to this file. Run them
-with the skill folder's path, e.g. `python <skill-dir>/scripts/strata_lint.py src/`.
+yourself with the skill folder's path, e.g. `python3 <skill-dir>/scripts/strata_lint.py src/`.
+The user should never have to set anything up. If `python3` is not found, try `python`, then
+`py -3` (Windows). If there is no Python at all, do the same calculation by hand with the
+formulas in `references/rent-model.md`, show the working, and say the tools were unavailable.
 
 | Script | Answers |
 |---|---|
@@ -64,10 +67,14 @@ with the skill folder's path, e.g. `python <skill-dir>/scripts/strata_lint.py sr
 | `strata_plan.py spec.json` | The cheapest block order, breakpoints and TTLs for one prompt, with $/request and $/day against the current order. Spec format: `examples/strata.example.json`. |
 | `rent_audit.py logs.jsonl` / `--codex-latest` | Where real spend went: entry, writes, rent, hikes, reasoning, output; the biggest context tenants in a Codex session; and what to change. |
 | `rent_calc.py admit\|compact\|ladder\|model-ladder\|ttl` | The break-even decisions with numbers. `model-ladder` compares a cheap model first (e.g. gpt-6.1-sol) with the strong one (e.g. gpt-6-astra) every time, including the strong model's cold cache on a retry. `-h` on each subcommand lists its inputs. |
+| `refresh_pricing.py` | Fetches the latest maintained pricing table into a cache that every script then uses. Run it when a script says prices are stale. |
 
-Prices come from `data/pricing.json`. The scripts warn when it is more than 60 days old. If the
-model is missing or the file is stale, say so, and offer to refresh it from the URL in the file.
-Never quote a dollar figure as current when it came from a stale table.
+Prices come from `data/pricing.json`, or from a newer copy that `refresh_pricing.py` saved. When a
+script warns that prices are more than 60 days old, run `scripts/refresh_pricing.py` (one GET for
+the project's public pricing file, nothing sent) and rerun the command. If the refresh fails, for
+example because a sandbox blocks network access, carry on with the bundled prices and say how
+old they are. If a model is missing from the table, say so. Never quote a dollar figure as
+current when it came from a stale table.
 
 ## Workflow A: an app that calls OpenAI
 
@@ -79,8 +86,9 @@ Never quote a dollar figure as current when it came from a stale table.
    code; the linter is a heuristic.
 3. **Plan the hot prompts.** For each high-traffic prompt, list its blocks with token size
    (count with tiktoken if installed, otherwise characters ÷ 4), how often each changes, and how
-   many live variants it has (users, tenants, open conversations). Ask the user for traffic
-   figures. If they don't know, state your assumptions in the spec file and in the report.
+   many live variants it has (users, tenants, open conversations). Estimate traffic and change
+   rates from the code, config, logs and git history first, and write the assumptions into the
+   spec file and the report. Ask the user only for a figure that would flip the recommendation.
    Run `strata_plan.py`, then reorder the code to match while keeping instructions readable and
    meaning unchanged.
 4. **Measure.** If usage logs exist, run `rent_audit.py` on them. If they don't, add the usage

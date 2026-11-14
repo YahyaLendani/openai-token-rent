@@ -19,21 +19,101 @@ MTOK = 1_000_000
 
 # --------------------------------------------------------------------------- pricing
 
-def load_pricing(path: str | None = None, warn: bool = True) -> dict:
-    path = path or os.environ.get("TOKEN_RENT_PRICING") or DEFAULT_PRICING
+UPDATE_URL = "https://raw.githubusercontent.com/YahyaLendani/openai-token-rent/main/data/pricing.json"
+
+
+def cache_path() -> str:
+    """Where refresh_pricing.py stores a newer pricing table (outside the skill folder)."""
+    if os.environ.get("TOKEN_RENT_CACHE"):
+        return os.path.join(os.environ["TOKEN_RENT_CACHE"], "pricing.json")
+    if os.name == "nt" and os.environ.get("LOCALAPPDATA"):
+        base = os.environ["LOCALAPPDATA"]
+    else:
+        base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+    return os.path.join(base, "token-rent", "pricing.json")
+
+
+def _as_of(data: dict) -> _dt.date | None:
+    try:
+        return _dt.date.fromisoformat(str(data.get("as_of", "")))
+    except ValueError:
+        return None
+
+
+def validate_pricing(data: Any) -> str | None:
+    """Returns None if `data` looks like a usable pricing table, else what is wrong."""
+    if not isinstance(data, dict):
+        return "not a JSON object"
+    if _as_of(data) is None:
+        return "missing or bad as_of date"
+    gens, models = data.get("cache_generations"), data.get("models")
+    if not isinstance(gens, dict) or not isinstance(models, dict) or not models:
+        return "missing cache_generations or models"
+    for name, m in models.items():
+        if not isinstance(m, dict) or m.get("cache") not in gens:
+            return f"model {name}: unknown cache generation"
+        for k in ("input", "output"):
+            if not isinstance(m.get(k), (int, float)) or m[k] < 0:
+                return f"model {name}: bad {k} price"
+    return None
+
+
+def _read_json(path: str):
     with open(path, encoding="utf-8") as fh:
-        data = json.load(fh)
-    if warn:
+        return json.load(fh)
+
+
+def load_pricing(path: str | None = None, warn: bool = True) -> dict:
+    """Explicit path or TOKEN_RENT_PRICING wins. Otherwise the bundled table, unless a refreshed
+    copy in the cache is valid and newer."""
+    path = path or os.environ.get("TOKEN_RENT_PRICING")
+    if path:
+        data = _read_json(path)
+    else:
+        data = _read_json(DEFAULT_PRICING)
         try:
-            as_of = _dt.date.fromisoformat(data.get("as_of", ""))
-            age = (_dt.date.today() - as_of).days
-            if age > STALE_DAYS:
-                print(f"[token-rent] pricing.json is {age} days old (as_of {as_of}). "
-                      f"Refresh it from {data.get('source')} before trusting dollar figures.",
-                      file=sys.stderr)
-        except ValueError:
+            cached = _read_json(cache_path())
+            if validate_pricing(cached) is None and _as_of(cached) > _as_of(data):
+                data = cached
+        except (OSError, ValueError):
             pass
+    if warn:
+        as_of = _as_of(data)
+        if as_of and (_dt.date.today() - as_of).days > STALE_DAYS:
+            here = os.path.join(HERE, "refresh_pricing.py")
+            print(f"[token-rent] prices are {(_dt.date.today() - as_of).days} days old (as_of {as_of}). "
+                  f"Run `python3 {here}` to fetch the latest table, then rerun this command.",
+                  file=sys.stderr)
     return data
+
+
+def refresh_pricing(url: str | None = None, timeout: float = 10.0) -> tuple[bool, str]:
+    """Downloads the maintained pricing table and stores it in the cache if it is valid and newer.
+    Sends nothing but a plain GET for one public file."""
+    import urllib.request
+    url = url or _read_json(DEFAULT_PRICING).get("update_url") or UPDATE_URL
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "token-rent-pricing-refresh"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            fetched = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:                                   # network, sandbox, HTTP or JSON error
+        return False, f"could not fetch {url}: {e}"
+    problem = validate_pricing(fetched)
+    if problem:
+        return False, f"downloaded table rejected ({problem}); keeping the current prices"
+    current = load_pricing(warn=False)
+    if _as_of(fetched) <= _as_of(current):
+        return True, f"already up to date (as_of {_as_of(current)})"
+    dest = cache_path()
+    try:
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        tmp = dest + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(fetched, fh, indent=1)
+        os.replace(tmp, dest)
+    except OSError as e:
+        return False, f"fetched prices as_of {_as_of(fetched)} but could not save them to {dest}: {e}"
+    return True, f"updated prices to as_of {_as_of(fetched)} ({len(fetched['models'])} models), saved to {dest}"
 
 
 def resolve_model(pricing: dict, name: str | None) -> tuple[str | None, dict | None]:
