@@ -1,0 +1,61 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      # unit tests, price refresh, and both installers (sh and PowerShell) against a local archive
+      - run: python -m unittest discover -s tests -v
+      - name: Lint the bundled examples
+        shell: bash
+        run: |
+          python scripts/strata_lint.py examples/fixed_app.py
+          ! python scripts/strata_lint.py examples/leaky_app.py > /dev/null
+
+  install-live:
+    # the real install from GitHub's latest release, as a user would run it
+    name: live install / ${{ matrix.os }}
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: install.sh
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          export TOKEN_RENT_HOME="$RUNNER_TEMP/home"; mkdir -p "$TOKEN_RENT_HOME/.claude"
+          sh install.sh
+          test -f "$TOKEN_RENT_HOME/.claude/skills/openai-token-rent/SKILL.md"
+          python3 "$TOKEN_RENT_HOME/.claude/skills/openai-token-rent/scripts/rent_calc.py" ttl -h > /dev/null
+      - name: install.ps1
+        shell: pwsh
+        run: |
+          $env:TOKEN_RENT_HOME = Join-Path $env:RUNNER_TEMP 'home-ps'
+          New-Item -ItemType Directory -Force (Join-Path $env:TOKEN_RENT_HOME '.claude') | Out-Null
+          Get-Content -Raw ./install.ps1 | Invoke-Expression
+          $skill = Join-Path (Join-Path (Join-Path (Join-Path $env:TOKEN_RENT_HOME '.claude') 'skills') 'openai-token-rent') 'SKILL.md'
+          if (-not (Test-Path $skill)) { throw 'not installed' }

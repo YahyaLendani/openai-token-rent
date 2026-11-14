@@ -37,14 +37,16 @@
         }
 
         $targets = @()
+        $agentsDir = Join-Path (Join-Path $HomeDir '.agents') 'skills'   # nested Join-Path: '\' is not a separator in pwsh on macOS/Linux
+        $claudeDir = Join-Path (Join-Path $HomeDir '.claude') 'skills'
         if ((Test-Path (Join-Path $HomeDir '.codex')) -or (Get-Command codex -ErrorAction SilentlyContinue)) {
-            $targets += (Join-Path $HomeDir '.agents\skills')
+            $targets += $agentsDir
         }
         if ((Test-Path (Join-Path $HomeDir '.claude')) -or (Get-Command claude -ErrorAction SilentlyContinue)) {
-            $targets += (Join-Path $HomeDir '.claude\skills')
+            $targets += $claudeDir
         }
         if ($targets.Count -eq 0) {
-            $targets += (Join-Path $HomeDir '.agents\skills')
+            $targets += $agentsDir
             Write-Host 'token-rent: no Codex or Claude Code found; installing to the standard ~\.agents\skills'
         }
 

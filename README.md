@@ -1,5 +1,7 @@
 # openai-token-rent
 
+[![tests](https://github.com/YahyaLendani/openai-token-rent/actions/workflows/test.yml/badge.svg)](https://github.com/YahyaLendani/openai-token-rent/actions/workflows/test.yml)
+
 **Lifetime-cost token optimization for OpenAI models.** An [Agent Skill](https://agentskills.io)
 for Codex CLI, Claude Code and any other agent that reads `SKILL.md`, plus four small
 zero-dependency Python tools.
