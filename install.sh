@@ -16,12 +16,15 @@ trap 'rm -rf "$tmp"' EXIT INT TERM
 
 if [ -z "$SRC" ]; then
   command -v curl >/dev/null 2>&1 || { echo "token-rent: curl is required" >&2; exit 1; }
-  # /releases/latest redirects to /releases/tag/<tag>; fall back to main if there is no release yet
-  latest=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" || true)
-  case "$latest" in
-    */tag/*) ref="refs/tags/${latest##*/tag/}" ;;
-    *)       ref="refs/heads/main" ;;
-  esac
+  # latest release tag from the API (the /releases/latest redirect can lag behind a new release);
+  # then the redirect (if the API is rate-limited); then main
+  tag=$(curl -fsSL -H 'User-Agent: token-rent-installer' "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
+        | sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1 || true)
+  if [ -z "$tag" ]; then
+    latest=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" 2>/dev/null || true)
+    case "$latest" in */tag/*) tag="${latest##*/tag/}" ;; esac
+  fi
+  if [ -n "$tag" ]; then ref="refs/tags/$tag"; else ref="refs/heads/main"; fi
   echo "token-rent: downloading $REPO ($ref)"
   curl -fsSL "https://codeload.github.com/$REPO/tar.gz/$ref" -o "$tmp/src.tar.gz"
   SRC="$tmp/src.tar.gz"
