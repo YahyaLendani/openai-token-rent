@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: audit-usage-export
+expected_outcome: |
+  The agent splits spend by group into entry, cache writes, rent, reasoning and visible output,
+  identifies that the "classify" calls on gpt-5.4-mini get no cache hits and spend most of
+  their cost on reasoning, and recommends concrete changes (effort ladder or lower effort, fixing
+  the prompt prefix so it caches, Batch/Flex if not user-facing) in a short summary.
+context:
+  scaffold_script: place-files.sh

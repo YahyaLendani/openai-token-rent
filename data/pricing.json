@@ -1,0 +1,62 @@
+{
+  "as_of": "2026-11-14",
+  "source": "https://developers.openai.com/api/docs/pricing",
+  "units": "USD per 1M tokens, Standard tier",
+  "notes": [
+    "Refresh this file from the source URL before trusting dollar figures. Scripts warn when as_of is older than 60 days.",
+    "long_context applies when input exceeds long_context.threshold tokens. The pricing page does not say whether it covers the whole request; the scripts assume it does (conservative).",
+    "Cache generation 'explicit' (GPT-5.6+ and GPT-6): cache reads cost read_multiplier x input, cache writes cost write_multipliers[ttl] x input, max 4 writes per request, prompt_cache_options replaces prompt_cache_retention.",
+    "Cache generation 'implicit' (earlier models): no write charge, reads cost cached_input, retention via prompt_cache_retention ('in_memory' or '24h').",
+    "Explicit-generation TTLs are minimum lifetimes. A 30m read refreshes coverage to at least 30 minutes after that read; a 30m read does not restart a 12h entry.",
+    "Implicit 'in_memory' retention is 'typically 5 to 10 minutes of inactivity' per the caching guide; 300s is used here as the conservative end.",
+    "Implicit-generation minimum prefix 'varies by request settings' per the caching guide; 1024 is an approximation.",
+    "24h retention is per model. The caching guide lists gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.2, gpt-5.1 (and its codex/chat variants), gpt-5, gpt-5-codex and gpt-4.1. Other implicit models here are in_memory only.",
+    "Batch and Flex are 50% of Standard. Fast mode (renamed from Priority on 2026-07-30) is roughly 2-2.5x Standard and varies by model; Ultrafast exists for gpt-6-astra and gpt-6.1-sol. Neither is modelled here.",
+    "Verified against the pricing page and prompt-caching guide on 2026-11-14."
+  ],
+  "tiers": { "standard": 1.0, "batch": 0.5, "flex": 0.5 },
+  "cache_generations": {
+    "explicit": {
+      "min_prefix_tokens": 1024,
+      "write_multipliers": { "30m": 1.25, "12h": 2.5 },
+      "ttl_seconds": { "30m": 1800, "12h": 43200 },
+      "max_writes_per_request": 4
+    },
+    "implicit": {
+      "min_prefix_tokens": 1024,
+      "write_multipliers": { "in_memory": 1.0, "24h": 1.0 },
+      "ttl_seconds": { "in_memory": 300, "24h": 86400 },
+      "max_writes_per_request": null
+    }
+  },
+  "models": {
+    "gpt-6-astra":   { "input": 10.0, "cached_input": 1.0,   "output": 50.0, "cache": "explicit", "long_context": { "threshold": 272000, "input": 20.0, "cached_input": 2.0,  "output": 75.0 } },
+    "gpt-6.1-sol":   { "input": 2.0,  "cached_input": 0.10,  "output": 10.0, "cache": "explicit", "long_context": { "threshold": 272000, "input": 4.0,  "cached_input": 0.20, "output": 15.0 } },
+    "gpt-6.1-terra": { "input": 1.0,  "cached_input": 0.05,  "output": 5.0,  "cache": "explicit", "long_context": { "threshold": 272000, "input": 2.0,  "cached_input": 0.10, "output": 7.5 } },
+    "gpt-6-sol":     { "input": 2.0,  "cached_input": 0.20,  "output": 10.0, "cache": "explicit", "long_context": { "threshold": 272000, "input": 4.0,  "cached_input": 0.40, "output": 15.0 } },
+    "gpt-6-luna":    { "input": 0.10, "cached_input": 0.01,  "output": 0.50, "cache": "explicit", "long_context": { "threshold": 272000, "input": 0.20, "cached_input": 0.02, "output": 0.75 } },
+    "gpt-5.6-sol":   { "input": 4.0,  "cached_input": 0.40,  "output": 20.0, "cache": "explicit", "long_context": { "threshold": 272000, "input": 8.0,  "cached_input": 0.80, "output": 30.0 } },
+    "gpt-5.6-terra": { "input": 2.0,  "cached_input": 0.20,  "output": 12.0, "cache": "explicit", "long_context": { "threshold": 272000, "input": 4.0,  "cached_input": 0.40, "output": 18.0 } },
+    "gpt-5.6-luna":  { "input": 0.20, "cached_input": 0.02,  "output": 1.20, "cache": "explicit", "long_context": { "threshold": 272000, "input": 0.40, "cached_input": 0.04, "output": 1.80 } },
+    "gpt-5.5":       { "input": 5.0,  "cached_input": 0.50,  "output": 30.0, "cache": "implicit", "retention": ["24h"], "long_context": { "threshold": 272000, "input": 10.0, "cached_input": 1.0, "output": 45.0 } },
+    "gpt-5.5-pro":   { "input": 30.0, "cached_input": null,  "output": 180.0, "cache": "implicit", "retention": ["24h"], "long_context": { "threshold": 272000, "input": 60.0, "cached_input": null, "output": 270.0 } },
+    "gpt-5.4":       { "input": 2.50, "cached_input": 0.25,  "output": 15.0, "cache": "implicit", "retention": ["in_memory", "24h"], "long_context": { "threshold": 272000, "input": 5.0, "cached_input": 0.50, "output": 22.5 } },
+    "gpt-5.4-pro":   { "input": 30.0, "cached_input": null,  "output": 180.0, "cache": "implicit", "retention": ["in_memory", "24h"] },
+    "gpt-5.4-mini":  { "input": 0.75, "cached_input": 0.075, "output": 4.50, "cache": "implicit", "retention": ["in_memory"] },
+    "gpt-5.4-nano":  { "input": 0.20, "cached_input": 0.02,  "output": 1.25, "cache": "implicit", "retention": ["in_memory"] },
+    "gpt-5.3-codex": { "input": 1.75, "cached_input": 0.175, "output": 14.0, "cache": "implicit", "retention": ["in_memory"] },
+    "gpt-5.2":       { "input": 1.75, "cached_input": 0.175, "output": 14.0, "cache": "implicit", "retention": ["in_memory", "24h"] },
+    "gpt-5.2-pro":   { "input": 21.0, "cached_input": null,  "output": 168.0, "cache": "implicit", "retention": ["in_memory"] },
+    "gpt-5.1":       { "input": 1.25, "cached_input": 0.125, "output": 10.0, "cache": "implicit", "retention": ["in_memory", "24h"] },
+    "gpt-5":         { "input": 1.25, "cached_input": 0.125, "output": 10.0, "cache": "implicit", "retention": ["in_memory", "24h"] },
+    "gpt-5-pro":     { "input": 15.0, "cached_input": null,  "output": 120.0, "cache": "implicit", "retention": ["in_memory"] },
+    "gpt-5-mini":    { "input": 0.25, "cached_input": 0.025, "output": 2.00, "cache": "implicit", "retention": ["in_memory"] },
+    "gpt-5-nano":    { "input": 0.05, "cached_input": 0.005, "output": 0.40, "cache": "implicit", "retention": ["in_memory"] },
+    "o3":            { "input": 2.00, "cached_input": 0.50,  "output": 8.00, "cache": "implicit", "retention": ["in_memory"] },
+    "o3-pro":        { "input": 20.0, "cached_input": null,  "output": 80.0, "cache": "implicit", "retention": ["in_memory"] },
+    "gpt-4.1":       { "input": 2.00, "cached_input": 0.50,  "output": 8.00, "cache": "implicit", "retention": ["in_memory", "24h"] },
+    "gpt-4.1-mini":  { "input": 0.40, "cached_input": 0.10,  "output": 1.60, "cache": "implicit", "retention": ["in_memory"] },
+    "gpt-4o":        { "input": 2.50, "cached_input": 1.25,  "output": 10.0, "cache": "implicit", "retention": ["in_memory"] },
+    "gpt-4o-mini":   { "input": 0.15, "cached_input": 0.075, "output": 0.60, "cache": "implicit", "retention": ["in_memory"] }
+  }
+}

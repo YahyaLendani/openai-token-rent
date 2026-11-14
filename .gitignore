@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+evals/results/
+*-workspace/
+*.skill
+tests/_tmp_*

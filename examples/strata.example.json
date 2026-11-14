@@ -1,0 +1,14 @@
+{
+  "model": "gpt-6.1-sol",
+  "requests_per_hour": 600,
+  "refresh_on_hit": true,
+  "segments": [
+    { "name": "system_rules",   "tokens": 1200,  "changes_per_day": 0.05, "pin": "first" },
+    { "name": "today_date",     "tokens": 20,    "changes_per_day": 1 },
+    { "name": "user_profile",   "tokens": 600,   "changes_per_day": 0.5, "partitions": 400 },
+    { "name": "tool_defs",      "tokens": 3500,  "changes_per_day": 0.1 },
+    { "name": "help_center",    "tokens": 28000, "changes_per_day": 2 },
+    { "name": "chat_history",   "tokens": 2500,  "changes_per_day": 0, "partitions": 400 },
+    { "name": "latest_message", "tokens": 120,   "per_request": true, "pin": "last" }
+  ]
+}

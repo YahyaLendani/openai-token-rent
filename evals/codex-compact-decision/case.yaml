@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: codex-compact-decision
+expected_outcome: |
+  The agent applies the eviction break-even (dead tokens x cached rate x requests left versus
+  compaction plus re-entry cost), estimates roughly 16-24 requests left from the user's numbers,
+  computes a break-even number of requests, and gives one clear recommendation with the dollar
+  or token figures behind it, noting that a new session is equivalent to compaction at a clean
+  task boundary.

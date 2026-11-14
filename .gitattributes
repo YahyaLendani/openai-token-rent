@@ -1,0 +1,4 @@
+# Store text with LF in the repo. Shell scripts keep LF on every checkout so bash can run them.
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf

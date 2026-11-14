@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: api-leaky-support-bot
+expected_outcome: |
+  The agent finds the cache-breaking patterns in support_bot.py (timestamp and user name in the
+  system prompt, uuid and shuffled examples in developer messages, filtered tools list, unsorted
+  json.dumps, prompt_cache_retention on a GPT-6 model), rewrites the call so stable shared blocks
+  come first and per-user / per-request data comes last, switches to prompt_cache_options, and
+  gives a savings estimate that is labelled as an estimate with its assumptions.
+context:
+  scaffold_script: place-files.sh
