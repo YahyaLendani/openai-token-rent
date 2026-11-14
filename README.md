@@ -41,13 +41,12 @@ examples/  tests/  evals/
 
 ## Install
 
-Clone this repository into your agent's skills folder. Use the URL from the
-**Code** button on this repository's GitHub page (or your fork's) as `<repo-url>`.
+Clone this repository into your agent's skills folder. If you use a fork, swap in its URL.
 
 **Codex CLI**: user-wide in `~/.agents/skills/`, or per repo in `.agents/skills/`:
 
 ```bash
-git clone <repo-url> ~/.agents/skills/openai-token-rent
+git clone https://github.com/YahyaLendani/openai-token-rent ~/.agents/skills/openai-token-rent
 ```
 
 Then use it with `$openai-token-rent`, or let it trigger on cost and caching questions.
@@ -55,7 +54,7 @@ Then use it with `$openai-token-rent`, or let it trigger on cost and caching que
 **Claude Code**: user-wide in `~/.claude/skills/`, or per repo in `.claude/skills/`:
 
 ```bash
-git clone <repo-url> ~/.claude/skills/openai-token-rent
+git clone https://github.com/YahyaLendani/openai-token-rent ~/.claude/skills/openai-token-rent
 ```
 
 **Anything else**: point your agent at `SKILL.md`. The scripts need only Python 3.9+.
