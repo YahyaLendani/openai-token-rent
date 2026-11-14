@@ -10,6 +10,7 @@ REPO="YahyaLendani/openai-token-rent"
 NAME="openai-token-rent"
 HOME_DIR="${TOKEN_RENT_HOME:-$HOME}"     # override for testing
 SRC="${TOKEN_RENT_SRC:-}"                 # a local .tar.gz instead of downloading (testing/offline)
+API="${TOKEN_RENT_API:-https://api.github.com}"   # override for testing the fallback
 
 tmp=$(mktemp -d 2>/dev/null || mktemp -d -t token-rent)
 trap 'rm -rf "$tmp"' EXIT INT TERM
@@ -18,7 +19,7 @@ if [ -z "$SRC" ]; then
   command -v curl >/dev/null 2>&1 || { echo "token-rent: curl is required" >&2; exit 1; }
   # latest release tag from the API (the /releases/latest redirect can lag behind a new release);
   # then the redirect (if the API is rate-limited); then main
-  tag=$(curl -fsSL -H 'User-Agent: token-rent-installer' "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
+  tag=$(curl -fsSL -H 'User-Agent: token-rent-installer' "$API/repos/$REPO/releases/latest" 2>/dev/null \
         | sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1 || true)
   if [ -z "$tag" ]; then
     latest=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" 2>/dev/null || true)

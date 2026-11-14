@@ -9,17 +9,29 @@
     $Name = 'openai-token-rent'
     $HomeDir = if ($env:TOKEN_RENT_HOME) { $env:TOKEN_RENT_HOME } else { $HOME }   # override for testing
     $Src = $env:TOKEN_RENT_SRC                                                       # local .zip (testing/offline)
+    $Api = if ($env:TOKEN_RENT_API) { $env:TOKEN_RENT_API } else { 'https://api.github.com' }   # override for testing the fallback
 
     $tmp = Join-Path ([IO.Path]::GetTempPath()) ('token-rent-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tmp | Out-Null
     try {
         if (-not $Src) {
             [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-            $ref = 'refs/heads/main'
+            # latest release tag from the API; then the /releases/latest redirect (if the API is
+            # rate-limited); then main
+            $tag = $null
             try {
-                $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ 'User-Agent' = 'token-rent-installer' }
-                if ($rel.tag_name) { $ref = "refs/tags/$($rel.tag_name)" }
+                $rel = Invoke-RestMethod -Uri "$Api/repos/$Repo/releases/latest" -Headers @{ 'User-Agent' = 'token-rent-installer' }
+                $tag = $rel.tag_name
             } catch { }
+            if (-not $tag) {
+                try {
+                    $r = Invoke-WebRequest -Uri "https://github.com/$Repo/releases/latest" -Method Head -UseBasicParsing
+                    $final = if ($r.BaseResponse.ResponseUri) { $r.BaseResponse.ResponseUri.AbsoluteUri }       # Windows PowerShell 5.1
+                             else { $r.BaseResponse.RequestMessage.RequestUri.AbsoluteUri }                       # PowerShell 7+
+                    if ($final -match '/tag/([^/?#]+)$') { $tag = $Matches[1] }
+                } catch { }
+            }
+            $ref = if ($tag) { "refs/tags/$tag" } else { 'refs/heads/main' }
             Write-Host "token-rent: downloading $Repo ($ref)"
             $Src = Join-Path $tmp 'src.zip'
             Invoke-WebRequest -Uri "https://codeload.github.com/$Repo/zip/$ref" -OutFile $Src -UseBasicParsing

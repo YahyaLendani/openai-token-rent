@@ -65,3 +65,19 @@ jobs:
           Get-Content -Raw ./install.ps1 | Invoke-Expression
           $skill = Join-Path (Join-Path (Join-Path (Join-Path $env:TOKEN_RENT_HOME '.claude') 'skills') 'openai-token-rent') 'SKILL.md'
           if (-not (Test-Path $skill)) { throw 'not installed' }
+      - name: release lookup falls back when the API is unreachable
+        shell: pwsh
+        run: |
+          $env:TOKEN_RENT_API = 'http://127.0.0.1:9'
+          $env:TOKEN_RENT_HOME = Join-Path $env:RUNNER_TEMP 'home-fb-ps'
+          New-Item -ItemType Directory -Force (Join-Path $env:TOKEN_RENT_HOME '.claude') | Out-Null
+          $out = Get-Content -Raw ./install.ps1 | Invoke-Expression 6>&1 | Out-String
+          $out
+          if ($out -notmatch 'refs/tags/v') { throw 'install.ps1 did not find the release tag without the API' }
+          if ($env:RUNNER_OS -ne 'Windows') {
+            $env:TOKEN_RENT_HOME = Join-Path $env:RUNNER_TEMP 'home-fb-sh'
+            New-Item -ItemType Directory -Force (Join-Path $env:TOKEN_RENT_HOME '.claude') | Out-Null
+            $out = sh ./install.sh | Out-String
+            $out
+            if ($out -notmatch 'refs/tags/v') { throw 'install.sh did not find the release tag without the API' }
+          }
