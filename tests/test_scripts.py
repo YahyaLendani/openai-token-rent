@@ -111,6 +111,29 @@ class Calc(unittest.TestCase):
         self.assertEqual(d["verdict"], "ladder")
         self.assertGreater(d["max_p_fail"], 0.3)
 
+    ML = ["model-ladder", "--input", "50000", "--prefix", "45000", "--reasoning-cheap", "4000",
+          "--reasoning-strong", "4000", "--p-fail", "0.25", "--json"]
+
+    def test_model_ladder_hand_maths(self):
+        d = json.loads(run(rent_calc.main, self.ML)[1])
+        self.assertEqual((d["cheap"], d["strong"]), ("gpt-6.1-sol", "gpt-6-astra"))
+        # Astra, warm: 45k x $1 + 5k x $10 x 1.25 (write) + 4.8k x $50, per 1M tokens
+        self.assertAlmostEqual(d["direct_usd"], 0.045 + 0.0625 + 0.24)
+        # Sol 6.1, warm: 45k x $0.10 + 5k x $2 x 1.25 + 4.8k x $10
+        self.assertAlmostEqual(d["first_try_usd"], 0.0045 + 0.0125 + 0.048)
+        # a cold retry writes the 45k prefix at 1.25x instead of reading it at $1
+        self.assertAlmostEqual(d["cold_retry_penalty_usd"], 45000 * 10e-6 * 1.25 - 0.045)
+        self.assertAlmostEqual(d["ladder_usd"], d["first_try_usd"] + 0.25 * d["retry_usd"])
+
+    def test_model_ladder_cold_cache_lowers_break_even(self):
+        cold = json.loads(run(rent_calc.main, self.ML)[1])
+        warm = json.loads(run(rent_calc.main, self.ML + ["--strong-cache-hit", "1"])[1])
+        self.assertLess(cold["max_p_fail"], warm["max_p_fail"])
+        self.assertLess(warm["ladder_usd"], cold["ladder_usd"])
+        # with a 60% failure rate the cold-cache ladder loses
+        d = json.loads(run(rent_calc.main, self.ML[:-2] + ["0.6", "--json"])[1])
+        self.assertEqual(d["verdict"], "direct")
+
     def test_ttl_choices(self):
         _, out = run(rent_calc.main, ["ttl", "--prefix", "30000", "--gap", "120", "--reuses", "50", "--json"])
         self.assertEqual(json.loads(out)["verdict"], "30m")

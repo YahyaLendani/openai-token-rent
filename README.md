@@ -34,7 +34,7 @@ references/codex-playbook.md Codex CLI habits, config.toml levers, break-even ta
 scripts/strata_lint.py      finds cache-breaking code (CI-friendly exit codes)
 scripts/strata_plan.py      cheapest block order + breakpoints + TTLs for a prompt
 scripts/rent_audit.py       splits real spend from API logs or Codex session files
-scripts/rent_calc.py        admit / compact / ladder / ttl break-even calculator
+scripts/rent_calc.py        admit / compact / ladder / model-ladder / ttl break-even calculator
 data/pricing.json           prices as of the date inside it (refresh it!)
 examples/  tests/  evals/
 ```

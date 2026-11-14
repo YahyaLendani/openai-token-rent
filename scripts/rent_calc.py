@@ -4,7 +4,9 @@
   admit    Should this block (file, tool output, document) enter the context, or a narrower one?
   compact  Is compacting / starting fresh cheaper than carrying dead context to the end?
   ladder   Is "low effort first, escalate on failed check" cheaper than high effort up front?
-  ttl      Which cache TTL (or none) is cheapest for a prefix with a given reuse pattern?
+  model-ladder  Is "cheap model first (e.g. Sol), strong model (e.g. Astra) on a failed check"
+           cheaper than the strong model every time? Accounts for per-model caches.
+  ttl     Which cache TTL (or none) is cheapest for a prefix with a given reuse pattern?
 
 All answers are in USD from data/pricing.json and are only as good as the inputs you give.
 Run `python rent_calc.py <command> -h` for each command's inputs.
@@ -115,6 +117,52 @@ def cmd_ladder(a) -> dict:
     }
 
 
+def cmd_model_ladder(a) -> dict:
+    """Direct: every call goes to the strong model. Ladder: the cheap model first, a check, and
+    with probability p a retry on the strong model.
+
+    Caches are per model, so the retry may find the strong model's copy of the prefix cold.
+    Steady traffic keeps the cache of the model you call every time warm; --strong-cache-hit
+    is the chance a retry finds the strong model's prefix still cached (0 = always cold).
+    """
+    pricing = rl.load_pricing(a.pricing)
+    cheap = rl.rates_for(pricing, a.cheap, a.input, a.tier)
+    strong = rl.rates_for(pricing, a.strong, a.input, a.tier)
+    prefix = max(0, min(a.prefix, a.input))
+    fresh = a.input - prefix
+    hit = min(1.0, max(0.0, a.strong_cache_hit))
+
+    def entry(r):
+        return rl.entry_mult(r) if a.entry_mult is None else a.entry_mult
+
+    def call(r, reasoning, p_warm):
+        cold_prefix = prefix * r.p_in * entry(r)
+        warm_prefix = prefix * r.p_cached
+        inp = p_warm * warm_prefix + (1 - p_warm) * cold_prefix + fresh * r.p_in * entry(r)
+        return inp + (reasoning + a.output) * r.p_out
+
+    direct = call(strong, a.reasoning_strong, 1.0)           # always-strong traffic keeps its cache warm
+    first = call(cheap, a.reasoning_cheap, 1.0)
+    retry = call(strong, a.reasoning_strong, hit)
+    ladder = first + a.check_usd + a.p_fail * retry
+    p_star = (direct - first - a.check_usd) / retry if retry > 0 else 0.0
+    p_star = max(0.0, min(1.0, p_star))
+    cold_penalty = call(strong, a.reasoning_strong, 0.0) - call(strong, a.reasoning_strong, 1.0)
+    verdict = "ladder" if ladder < direct else "direct"
+    note = ""
+    if prefix and hit < 1.0 and cold_penalty > 0:
+        note = (f" A retry that finds {strong.model}'s cache cold pays {rl.usd(cold_penalty)} extra for the "
+                f"{prefix:,}-token prefix; pass --strong-cache-hit if retries are frequent enough to keep it warm.")
+    return {
+        "decision": "model-ladder", "cheap": cheap.model, "strong": strong.model, "verdict": verdict,
+        "direct_usd": direct, "ladder_usd": ladder, "first_try_usd": first, "retry_usd": retry,
+        "max_p_fail": p_star, "cold_retry_penalty_usd": cold_penalty,
+        "why": (f"Always {strong.model} costs {rl.usd(direct)} per call; {cheap.model} first, then "
+                f"{strong.model} on a failed check, costs {rl.usd(ladder)} at a {a.p_fail:.0%} failure rate. "
+                f"The ladder wins while {cheap.model} fails less than {p_star:.0%} of the time." + note),
+    }
+
+
 def cmd_ttl(a) -> dict:
     r = _rates(a, a.prefix)
     rows = []
@@ -142,14 +190,15 @@ def cmd_ttl(a) -> dict:
 
 
 def main(argv=None):
-    common = argparse.ArgumentParser(add_help=False)
+    base = argparse.ArgumentParser(add_help=False)
+    base.add_argument("--tier", default="standard", choices=["standard", "batch", "flex"])
+    base.add_argument("--pricing", default=None, help="path to pricing.json (default: bundled)")
+    base.add_argument("--json", action="store_true", help="print JSON instead of a sentence")
+    base.add_argument("--entry-mult", type=float, default=None,
+                      help="price of a new token as a multiple of input (default 1.25 on GPT-5.6+, "
+                           "where new tokens are cache writes; 1 elsewhere)")
+    common = argparse.ArgumentParser(add_help=False, parents=[base])
     common.add_argument("--model", default="gpt-6.1-sol")
-    common.add_argument("--tier", default="standard", choices=["standard", "batch", "flex"])
-    common.add_argument("--pricing", default=None, help="path to pricing.json (default: bundled)")
-    common.add_argument("--json", action="store_true", help="print JSON instead of a sentence")
-    common.add_argument("--entry-mult", type=float, default=None,
-                        help="price of a new token as a multiple of input (default 1.25 on GPT-5.6+, "
-                             "where new tokens are cache writes; 1 elsewhere)")
 
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -181,6 +230,22 @@ def main(argv=None):
     s.add_argument("--no-cached-escalation", dest="cached_escalation", action="store_false",
                    help="escalation re-sends input uncached (different model or broken prefix)")
     s.set_defaults(fn=cmd_ladder)
+
+    s = sub.add_parser("model-ladder", parents=[base],
+                       help="cheap model first, strong model on a failed check, vs. strong model always")
+    s.add_argument("--cheap", default="gpt-6.1-sol", help="model tried first")
+    s.add_argument("--strong", default="gpt-6-astra", help="model used on a failed check, or always")
+    s.add_argument("--input", type=int, required=True, help="input tokens per call")
+    s.add_argument("--prefix", type=int, default=0,
+                   help="of those, tokens in a stable shared prefix that steady traffic keeps cached")
+    s.add_argument("--output", type=int, default=800, help="visible output tokens")
+    s.add_argument("--reasoning-cheap", type=int, default=0, help="reasoning tokens on the cheap model")
+    s.add_argument("--reasoning-strong", type=int, default=0, help="reasoning tokens on the strong model")
+    s.add_argument("--p-fail", type=float, required=True, help="share of cheap-model answers that fail the check")
+    s.add_argument("--check-usd", type=float, default=0.0, help="cost of the check (tests are ~0)")
+    s.add_argument("--strong-cache-hit", type=float, default=0.0,
+                   help="chance a retry finds the strong model's prefix cached (default 0: cold)")
+    s.set_defaults(fn=cmd_model_ladder)
 
     s = sub.add_parser("ttl", parents=[common], help="cheapest cache TTL for one prefix")
     s.add_argument("--prefix", type=int, required=True, help="prefix tokens")

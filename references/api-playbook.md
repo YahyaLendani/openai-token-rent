@@ -106,6 +106,11 @@ task needs (usually the day), and put them in the last message.
   OpenAI suggests at least 25,000 tokens for reasoning plus output when you first tune a task.
 - **Effort ladder**: run low, check (schema, tests, a gpt-6-luna judge), escalate on failure.
   `rent_calc.py ladder --input I --low a --high b --p-fail f` tells you whether it pays.
+- **Model ladder**: try a cheaper model first (gpt-6.1-sol, gpt-6.1-terra) and retry on gpt-6-astra
+  only when the check fails. Caches are per model, so a rare retry usually finds Astra's copy of
+  the prefix cold and pays the full write price for it.
+  `rent_calc.py model-ladder --input I --prefix P --reasoning-cheap a --reasoning-strong b --p-fail f`
+  prices that; pass `--strong-cache-hit` if retries are frequent enough to keep Astra's cache warm.
 - **Changing effort mid-conversation** (GPT-6+): leave the top-level `reasoning.effort`
   unchanged and append an input item instead, which keeps the prefix:
   `{"type": "configuration_update", "reasoning": {"effort": "high"}}`.

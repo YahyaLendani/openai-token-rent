@@ -189,6 +189,24 @@ Typical numbers (20k input, 1.5k low vs 12k high reasoning tokens, gpt-6.1-sol):
 while low effort fails less than ~80% of the time. A free check (tests, schema validation) is
 what makes the ladder work. Without one, use high effort for hard tasks.
 
+**Across models** (`rent_calc.py model-ladder`). The same shape holds with a cheap model `m` and a
+strong model `M`, with one difference: caches are per model, so the retry cannot reuse the cheap
+model's cached prefix. Split the input into a stable prefix `P` and new tokens `N = I − P`, and let
+`h` be the chance the retry finds `M`'s copy of the prefix still cached:
+
+```
+c_M(warm) = P · p_c(M) + N · e · p_in(M) + (ρ_M + O) · p_out(M)        always-M traffic keeps M warm
+c_m       = P · p_c(m) + N · e · p_in(m) + (ρ_m + O) · p_out(m)
+c_retry   = c_M(warm) + (1 − h) · P · (e · p_in(M) − p_c(M))
+ladder    = c_m + v + f · c_retry          wins iff  f < (c_M(warm) − c_m − v) / c_retry
+```
+
+`e` is the entry multiplier (1.25 on GPT-5.6+, where new tokens are 30m writes). Example: 50k input
+with a 45k prefix, 4k reasoning on both, gpt-6.1-sol then gpt-6-astra. Always Astra costs $0.35 a
+call. With a cold retry the ladder wins while Sol fails less than ~33% of the time; with a warm
+Astra cache, while it fails less than ~81%. The cold prefix, not the model price, decides most of
+the gap, so a model ladder pays best on short prompts or when retries keep the strong model warm.
+
 ## 11. Assumptions and limits
 
 - Prices are list prices from `data/pricing.json`. Discounts, regional uplift (10% for models

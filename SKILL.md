@@ -63,7 +63,7 @@ with the skill folder's path, e.g. `python <skill-dir>/scripts/strata_lint.py sr
 | `strata_lint.py <paths>` | Which lines break prompt caching (clock, ids, shuffles, per-user data in the system prompt, dynamic tools, unsorted JSON, wrong cache params). Exit 1 on high findings, so it can run in CI. |
 | `strata_plan.py spec.json` | The cheapest block order, breakpoints and TTLs for one prompt, with $/request and $/day against the current order. Spec format: `examples/strata.example.json`. |
 | `rent_audit.py logs.jsonl` / `--codex-latest` | Where real spend went: entry, writes, rent, hikes, reasoning, output; the biggest context tenants in a Codex session; and what to change. |
-| `rent_calc.py admit\|compact\|ladder\|ttl` | The four break-even decisions with numbers. `-h` on each subcommand lists its inputs. |
+| `rent_calc.py admit\|compact\|ladder\|model-ladder\|ttl` | The break-even decisions with numbers. `model-ladder` compares a cheap model first (e.g. gpt-6.1-sol) with the strong one (e.g. gpt-6-astra) every time, including the strong model's cold cache on a retry. `-h` on each subcommand lists its inputs. |
 
 Prices come from `data/pricing.json`. The scripts warn when it is more than 60 days old. If the
 model is missing or the file is stale, say so, and offer to refresh it from the URL in the file.
@@ -87,7 +87,8 @@ Never quote a dollar figure as current when it came from a stale table.
    meter from `references/api-playbook.md` so the next audit has data, and say that the savings
    so far are estimates.
 5. **Reasoning and output.** Find calls whose reasoning share is high, or calls that use one
-   fixed high effort for everything. Propose the effort ladder (`rent_calc.py ladder`) with a
+   fixed high effort for everything, or the most expensive model for everything. Propose the
+   effort ladder (`rent_calc.py ladder`) or the model ladder (`rent_calc.py model-ladder`) with a
    concrete check: schema validation, tests, or a cheap judge model. Lower `text.verbosity`. Ask
    for diffs, ids or fields instead of rewritten text. Move non-interactive work to Batch or Flex
    (50% off everything).
