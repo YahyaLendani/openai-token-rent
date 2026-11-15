@@ -1,0 +1,32 @@
+name: Prices are out of date
+description: A price, model or caching rule in data/pricing.json no longer matches OpenAI.
+title: "[prices] "
+labels: [prices]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fixes to `data/pricing.json` on main reach every user automatically (the scripts fetch the
+        newer table), so these reports matter. A link to the OpenAI page is the most useful part.
+  - type: input
+    id: model
+    attributes:
+      label: Model(s)
+      placeholder: e.g. gpt-6.1-sol
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: What changed?
+      description: Old value → new value (input, cached input, output, long-context, cache TTL or write price), or a new or retired model.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source
+      description: Link to the OpenAI pricing page, caching guide or announcement.
+      placeholder: https://developers.openai.com/api/docs/pricing
+    validations:
+      required: true

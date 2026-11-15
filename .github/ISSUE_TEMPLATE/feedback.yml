@@ -1,0 +1,53 @@
+name: How did it go?
+description: Tell us what the skill did on your code or session, good or bad.
+title: "[feedback] "
+labels: [feedback]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying openai-token-rent. Short answers are fine. Please don't paste API keys,
+        customer data or anything private; numbers and shapes are enough.
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Where did you use it?
+      options:
+        - "Codex CLI"
+        - "Claude Code"
+        - "claude.ai"
+        - "Another agent"
+        - "Ran the scripts myself"
+    validations:
+      required: true
+  - type: input
+    id: models
+    attributes:
+      label: Which OpenAI model(s) does your app or session use?
+      placeholder: e.g. gpt-6.1-sol, gpt-5.4-mini
+  - type: dropdown
+    id: helped
+    attributes:
+      label: Did it help?
+      options:
+        - "Yes, it found real savings"
+        - "Somewhat"
+        - "No"
+        - "Too early to tell"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What did it tell you to change?
+      description: The main recommendations, and whether you applied them.
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened to cost or cache hit rate?
+      description: Before and after, if you have it (e.g. cached_tokens share, $/day). Estimates are fine; say so.
+  - type: textarea
+    id: wrong
+    attributes:
+      label: Anything wrong, confusing, or missing?
+      description: Wrong numbers, bad advice, a script error (paste the message), or a case it didn't handle.
