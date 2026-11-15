@@ -6,8 +6,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Fixes to `data/pricing.json` on main reach every user automatically (the scripts fetch the
-        newer table), so these reports matter. A link to the OpenAI page is the most useful part.
+        Fixes to `data/pricing.json` on main reach users without a reinstall: once their bundled
+        table is 60 days old, the agent fetches the newer one. A link to the OpenAI page is the most
+        useful part of a report.
   - type: input
     id: model
     attributes:
