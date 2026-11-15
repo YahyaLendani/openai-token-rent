@@ -3,7 +3,7 @@
 [![tests](https://github.com/YahyaLendani/openai-token-rent/actions/workflows/test.yml/badge.svg)](https://github.com/YahyaLendani/openai-token-rent/actions/workflows/test.yml)
 
 **Lifetime-cost token optimization for OpenAI models.** An [Agent Skill](https://agentskills.io)
-for Codex CLI, Claude Code and any other agent that reads `SKILL.md`, plus five small
+for Codex CLI, Claude Code, ChatGPT and any other agent that reads `SKILL.md`, plus five small
 zero-dependency Python tools.
 
 Most token advice counts tokens: shorter prompts, smaller models, turn caching on. This skill
@@ -66,6 +66,20 @@ repository and copies it to `~/.agents/skills/openai-token-rent` (Codex) and/or
 `~/.claude/skills/openai-token-rent` (Claude Code). If neither agent is found it uses
 `~/.agents/skills`. It uploads nothing about you, touches nothing outside those folders, and leaves a git clone alone.
 To read it before you run it, open [install.sh](install.sh) or [install.ps1](install.ps1).
+
+**ChatGPT** (Business, Enterprise, Healthcare and Edu plans, where your workspace allows skills):
+
+1. Download `openai-token-rent.zip` from the
+   [latest release](https://github.com/YahyaLendani/openai-token-rent/releases/latest).
+2. In ChatGPT, open **Plugins → Skills → Create → Upload from your computer** and pick the zip.
+3. Upload your code (or a zip of the repo), an API usage export, or a Codex session file, and ask
+   where the money goes. ChatGPT runs the scripts in its sandbox and hands back a report and
+   changed files.
+
+ChatGPT's sandbox usually has no internet access, so it uses the prices bundled in the release.
+OpenAI's help center lists skills only for the plans above (as of November 2026). On other plans
+you can still upload the zip into a chat and ask ChatGPT to follow its `SKILL.md`. This helps with API and Codex costs; a ChatGPT subscription
+isn't billed per token, so it won't lower that.
 
 **Other ways:**
 

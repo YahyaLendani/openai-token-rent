@@ -1,0 +1,45 @@
+name: release bundles
+
+# Attaches openai-token-rent.zip (ChatGPT) and openai-token-rent.skill (claude.ai) to each release.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to (re)build the bundles for
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  bundles:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python .github/scripts/build_bundle.py dist
+      - name: Check the bundle loads as a skill
+        run: |
+          python - <<'EOF'
+          import re, zipfile
+          z = zipfile.ZipFile("dist/openai-token-rent.zip")
+          tops = {n.split("/")[0] for n in z.namelist()}
+          assert tops == {"openai-token-rent"}, tops
+          s = z.read("openai-token-rent/SKILL.md").decode()
+          fm = re.match(r"---\n(.*?)\n---\n", s, re.S).group(1)
+          assert re.search(r"^name: openai-token-rent$", fm, re.M)
+          d = re.search(r"^description: (.+)$", fm, re.M).group(1)
+          assert len(d) <= 1024, len(d)
+          print("ok:", len(z.namelist()), "files, description", len(d), "chars")
+          EOF
+      - run: gh release upload "$TAG" dist/openai-token-rent.zip dist/openai-token-rent.skill --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

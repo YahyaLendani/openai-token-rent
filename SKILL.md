@@ -1,6 +1,6 @@
 ---
 name: openai-token-rent
-description: Lifetime-cost token optimization for OpenAI models (GPT-5.x, GPT-6, Codex). Treats every token as a tenant that pays an entry price, then rent on every later request, plus a penalty when its cached prefix breaks, and uses that to plan prompt layout, cache TTLs, reasoning effort, context reads and compaction. Use it whenever code calls the OpenAI API (Responses, Chat Completions, Agents SDK, openai-python, openai-node) and cost, tokens, latency, prompt caching, cache hit rate, prompt_cache_key, prompt_cache_options, reasoning effort, verbosity, Batch, Flex or model choice comes up; when auditing OpenAI usage logs or a bill; and inside Codex CLI during long or expensive sessions, before large file reads, or near compaction. Use it even when the user only says "make this cheaper" about OpenAI code. Not for Anthropic/Claude API work.
+description: Lifetime-cost token optimization for OpenAI models (GPT-5.x, GPT-6, Codex). Treats every token as a tenant that pays an entry price, then rent on every later request, plus a penalty when its cached prefix breaks, and uses that to plan prompt layout, cache TTLs, reasoning effort, context reads and compaction. Use it whenever code calls the OpenAI API (Responses, Chat Completions, Agents SDK, openai-python, openai-node) and cost, tokens, latency, prompt caching, cache hit rate, prompt_cache_key, prompt_cache_options, reasoning effort, verbosity, Batch, Flex or model choice comes up; when auditing OpenAI usage logs or a bill; inside Codex CLI during long or expensive sessions, before large file reads, or near compaction; and in ChatGPT when the user uploads OpenAI code, usage logs or a bill. Use it even when the user only says "make this cheaper" about OpenAI code. Not for Anthropic/Claude API work.
 ---
 
 # Token Rent
@@ -50,8 +50,10 @@ requirement is a loss, so every ladder has a check and every layout change keeps
 - **A. Code that calls the OpenAI API** (the user's app, service, eval harness, agent). Go to
   Workflow A.
 - **B. You are running inside Codex CLI** and the cost is your own session. Go to Workflow B.
+- **C. You are running in ChatGPT** (or another hosted sandbox with no repo of its own). Go to
+  Workflow C, which runs Workflow A on files the user uploads.
 
-Both can apply: in Codex, optimizing the user's OpenAI app is Workflow A.
+A and B can both apply: in Codex, optimizing the user's OpenAI app is Workflow A.
 
 ## Tools
 
@@ -132,6 +134,24 @@ task needs. Then:
 
 Read `references/codex-playbook.md` for config.toml levers, a break-even table for narrow reads,
 and installation paths.
+
+## Workflow C: in ChatGPT
+
+ChatGPT runs this skill's scripts in a sandbox. The user's files arrive as uploads (usually under
+`/mnt/data`), and outbound network access is normally off.
+
+- **Get the inputs.** Ask for what the task needs: the source files or a zip of the repo, an API
+  usage export (JSONL), or a Codex session file from `~/.codex/sessions`. Unzip archives into
+  their own folder under `/mnt/data` and run the scripts with paths to them.
+- **Then follow Workflow A** on those files. Steps that need the live app (deploying, measuring
+  after a change) become instructions for the user.
+- **Prices:** don't run `refresh_pricing.py` when the sandbox has no network. Use the bundled
+  table and state its `as_of` date in the report.
+- **Hand back files, not just advice.** Write changed source files and the report to
+  `/mnt/data/token-rent-output/` and link them so the user can download them.
+- **ChatGPT's own usage is not billed per token.** If the user asks how to make their ChatGPT
+  plan cheaper, say that the dollar figures here apply to the API and to Codex with an API key,
+  not to a ChatGPT subscription.
 
 ## Going deeper
 

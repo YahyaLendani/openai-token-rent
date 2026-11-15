@@ -299,6 +299,37 @@ class Installer(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(home, ".claude", "skills")))
 
 
+class Bundle(unittest.TestCase):
+    """The uploadable zip (ChatGPT) / .skill (claude.ai): one folder, valid SKILL.md, no dev files."""
+
+    def test_bundle_shape(self):
+        import re
+        import shutil
+        import subprocess
+        import tempfile
+        import zipfile
+        if not shutil.which("git") or not os.path.isdir(os.path.join(ROOT, ".git")):
+            self.skipTest("not a git checkout")
+        out = tempfile.mkdtemp()
+        try:
+            subprocess.run([sys.executable, os.path.join(ROOT, ".github", "scripts", "build_bundle.py"), out],
+                           check=True, capture_output=True)
+            for ext in ("zip", "skill"):
+                z = zipfile.ZipFile(os.path.join(out, "openai-token-rent." + ext))
+                names = z.namelist()
+                self.assertEqual({n.split("/")[0] for n in names}, {"openai-token-rent"})
+                self.assertFalse([n for n in names if re.search(r"/(tests|evals|\.github)/|install\.(sh|ps1)$", n)])
+                for needed in ("SKILL.md", "data/pricing.json", "scripts/rentlib.py", "scripts/refresh_pricing.py"):
+                    self.assertIn("openai-token-rent/" + needed, names)
+                skill = z.read("openai-token-rent/SKILL.md").decode("utf-8")
+                fm = re.match(r"---\n(.*?)\n---\n", skill, re.S).group(1)
+                self.assertRegex(fm, r"(?m)^name: openai-token-rent$")
+                self.assertLessEqual(len(re.search(r"(?m)^description: (.+)$", fm).group(1)), 1024)
+                self.assertNotIn(b"\r\n", skill.encode("utf-8"))
+        finally:
+            shutil.rmtree(out, ignore_errors=True)
+
+
 class Plan(unittest.TestCase):
     def test_example_moves_volatile_segments_down(self):
         _, out = run(strata_plan.main, [os.path.join(EX, "strata.example.json"), "--json"])
